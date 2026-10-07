@@ -30,6 +30,8 @@ repo is pure text.
 | **RMB** | Place the selected block on a supported spot |
 | **Q** | Cycle the held tool (pickaxe ↔ axe) |
 | **1-4** | Pick a hotbar slot |
+| **T** | Teleport to the dungeon gate |
+| **C** | Drop into the nearest cave |
 | **F** | Toggle background walls |
 | **G** | Regenerate with a new seed |
 
@@ -95,6 +97,8 @@ godot --headless --path . --script res://tools/input_dump.gd
 godot --headless --path . --script res://tools/dungeon_probe.gd
 godot --headless --path . --script res://tools/world_png.gd
 godot --path . --script res://tools/demo_shots.gd   # windowed, needs a display
+godot --path . -- --goto=dungeon                    # start at the dungeon gate
+godot --path . -- --goto=cave                       # start inside a cave
 ```
 
 ## How generation works

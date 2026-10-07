@@ -6,7 +6,9 @@ extends Node2D
 ## Controls: arrows / A-D to move, Space to jump,
 ##           hold LMB to dig, RMB to place the selected block,
 ##           Q switch tool, 1-4 pick a hotbar slot,
-##           F toggle background walls, G new seed.
+##           F toggle background walls, G new seed,
+##           T jump to the dungeon gate, C drop into a cave.
+## Launch with `-- --goto=dungeon` (or `--goto=cave`) to start there.
 
 const WORLD_W := 1600
 const WORLD_H := 400
@@ -25,6 +27,9 @@ const BIOME_NAMES := ["Plains", "Forest", "Desert", "Jungle", "Tundra"]
 var gen: WorldGen
 var world_seed := 0
 
+## One-shot HUD line set by the teleporters; cleared on regenerate.
+var hud_flash := ""
+
 
 func _ready() -> void:
     _generate(SEED_NAME)
@@ -33,6 +38,7 @@ func _ready() -> void:
 func _generate(seed_name: String) -> void:
     loading.visible = true
     status.text = "Generating world..."
+    hud_flash = ""
     # Let the loading screen actually paint before we block the thread.
     await get_tree().process_frame
 
@@ -56,6 +62,12 @@ func _generate(seed_name: String) -> void:
     cam.reset_smoothing()
 
     loading.visible = false
+
+    var args := OS.get_cmdline_user_args()
+    if args.has("--goto=dungeon"):
+        _teleport_to_dungeon()
+    elif args.has("--goto=cave"):
+        _teleport_to_cave()
 
 
 ## Column-major so consecutive writes land near each other in memory,
@@ -93,6 +105,8 @@ func _process(_delta: float) -> void:
     var hotbar: String = player.hud_hotbar_text()
     info.text = "x %5d   y %4d   depth %4d   %s   %s\n%s" % [
         tx, ty, depth, BIOME_NAMES[biome], tool_text, hotbar]
+    if hud_flash != "":
+        info.text += "\n" + hud_flash
 
 
 ## Breaks a tile and returns the item picked up (-1 = nothing).
@@ -147,9 +161,81 @@ func _overlaps_player(tx: int, ty: int) -> bool:
 func _unhandled_input(event: InputEvent) -> void:
     if event is InputEventKey and event.pressed and not event.echo:
         match event.keycode:
+            KEY_T:
+                _teleport_to_dungeon()
+            KEY_C:
+                _teleport_to_cave()
             KEY_F:
                 walls_layer.visible = not walls_layer.visible
             KEY_G:
                 tiles_layer.clear()
                 walls_layer.clear()
                 _generate("cavebound-%d" % randi())
+
+
+# ------------------------------------------------------------- teleporting
+
+func _snap_camera() -> void:
+    var cam := player.get_node("Camera2D") as Camera2D
+    cam.reset_smoothing()
+
+
+## Park the player on top of a solid ground row: the body centre sits
+## 11px above the cell top so the feet rest exactly on it.
+func _stand_on(cx: int, gy: int) -> void:
+    player.velocity = Vector2.ZERO
+    player.global_position = Vector2((cx + 0.5) * TILE, gy * TILE - 11.0)
+
+
+## Drop the player into the middle of an air cell inside a cave.
+func _drop_into(cx: int, cy: int) -> void:
+    player.velocity = Vector2.ZERO
+    player.global_position = Vector2((cx + 0.5) * TILE, (cy + 0.5) * TILE)
+
+
+## Teleport to the surface just outside the dungeon door, so the gate is
+## on screen. The door faces the approach side (dir==1: door on the west
+## side of the gate, dungeon to the east).
+func _teleport_to_dungeon() -> void:
+    if gen == null or gen.dungeon_entrance_x < 0:
+        hud_flash = "no dungeon this seed - press G to reseed"
+        return
+    var gx := gen.dungeon_entrance_x
+    var land_x: int = clampi(gx - 3 if gen.dungeon_dir == 1 else gx + 3, 1, WORLD_W - 2)
+    _stand_on(land_x, gen.surface[land_x])
+    _snap_camera()
+    hud_flash = "Dungeon gate at x=%d - it is to your %s" % [
+            gx, "RIGHT" if gen.dungeon_dir == 1 else "LEFT"]
+
+
+## Scan outward from the world centre for the first underground pocket
+## the player actually fits in (air above and below the body's middle
+## cell, solid floor), then drop them into it.
+func _teleport_to_cave() -> void:
+    if gen == null:
+        return
+    var found := Vector2i(-1, -1)
+    for dx: int in range(gen.width / 2):
+        for sx: int in [gen.width / 2 - dx, gen.width / 2 + dx]:
+            if sx < 1 or sx >= gen.width - 1:
+                continue
+            for y: int in range(mini(gen.surface[sx] + 12, gen.height - 3), gen.height - 3):
+                var i: int = y * gen.width + sx
+                if gen.tiles[i] != WorldGen.Tile.AIR:
+                    continue
+                if gen.tiles[i - gen.width] != WorldGen.Tile.AIR:
+                    continue  # no headroom
+                if gen.tiles[i + gen.width] == WorldGen.Tile.AIR:
+                    continue  # no floor to stand on
+                found = Vector2i(sx, y)
+                break
+            if found.x >= 0:
+                break
+        if found.x >= 0:
+            break
+    if found.x < 0:
+        hud_flash = "no cave found nearby - press G to reseed"
+        return
+    _drop_into(found.x, found.y)
+    _snap_camera()
+    hud_flash = "Inside a cave at (%d, %d) - dig your way out" % [found.x, found.y]

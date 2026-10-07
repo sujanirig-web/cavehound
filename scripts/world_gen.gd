@@ -59,6 +59,11 @@ var width := 0
 var height := 0
 var spawn := Vector2i.ZERO
 
+## Where the dungeon gate sits (column of the entrance shaft) and which
+## side it is on, set by the dungeon pass. -1 means this seed has none.
+var dungeon_entrance_x := -1
+var dungeon_dir := 1
+
 
 func generate(world_seed: int, w: int, h: int) -> void:
     width = w
@@ -480,6 +485,8 @@ func _pass_dungeon(rng: RandomNumberGenerator) -> void:
     var dir := 1 if rng.randf() < 0.5 else -1
     var entrance_x := clampi(width / 2 + dir * rng.randi_range(240, 420),
             70, width - 70)
+    dungeon_dir = dir
+    dungeon_entrance_x = entrance_x
     var base_y := surface[entrance_x] + rng.randi_range(45, 65)
 
     # --- layout: one room per accepted step of a clamped grid walk.
