@@ -3,10 +3,11 @@ extends RefCounted
 
 ## Builds a TileSet entirely in code.
 ##
-## The art is placeholder, generated procedurally into an Image at
-## startup. That keeps the repo pure text (no PNGs to diff) and means
-## you can iterate on colours without touching an image editor. Replace
-## `build()` with a load of a real atlas once you have art.
+## Every tile is painted procedurally at runtime (grass blades, cracked
+## stone, bark-grooved wood, masonry, ore glints …) into an Image. That
+## keeps the repo pure text (no PNGs to diff) and means the art can be
+## tuned without an image editor. Replace `build()` with a load of a
+## real atlas once you have hand-drawn art.
 
 const TILE_SIZE := 16
 const ATLAS_COLS := 8

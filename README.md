@@ -15,9 +15,10 @@ godot --editor ~/Projects/cavebound
 Hit **F5**. The editor will import and register the `class_name` scripts
 on first open.
 
-No binary assets ship with the project — the placeholder tile art is
-generated into an `Image` at startup by `TilesetFactory`, so the repo is
-pure text.
+No binary assets ship with the project — the tile art is painted
+procedurally at runtime by `TilesetFactory` (per-tile textures with
+speckle, cracks, bark, masonry and ore glints, not flat fills), so the
+repo is pure text.
 
 ## Controls
 
@@ -43,7 +44,7 @@ stays under the same fingers on AZERTY/QWERTZ.
 
 ```
 scripts/world_gen.gd       generation passes (only engine dep is FastNoiseLite)
-scripts/tileset_factory.gd builds the TileSet + placeholder art in code
+scripts/tileset_factory.gd paints the TileSet art in code (textured, not flat)
 scripts/tools.gd           tool + mining table (what digs what, how fast)
 scripts/target_cursor.gd   aim outline + mining progress fill
 scripts/player.gd          CharacterBody2D controller, dig/build, inventory
