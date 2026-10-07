@@ -56,6 +56,7 @@ var _swinging := false
 var _swing_t := 0.0
 var _iframes := 0.0
 var _melee_cd := 0.0
+var _run_fps := -1.0
 
 
 func _ready() -> void:
@@ -119,11 +120,19 @@ func _animate(delta: float) -> void:
     var next := "idle"
     if not is_on_floor():
         next = "jump" if velocity.y < 0.0 else "fall"
+        _run_fps = -1.0
     elif absf(velocity.x) > RUN_ANIM_MIN:
         next = "run"
         # Scale the cycle with speed so walking and sprinting differ.
-        sprite.sprite_frames.set_animation_speed(
-                "run", clampf(absf(velocity.x) / 6.0, 6.0, 16.0))
+        # Only touch the resource when the value actually changes -
+        # rewriting set_animation_speed every frame dirties SpriteFrames
+        # for no reason.
+        var fps := clampf(absf(velocity.x) / 6.0, 6.0, 16.0)
+        if fps != _run_fps:
+            _run_fps = fps
+            sprite.sprite_frames.set_animation_speed("run", fps)
+    else:
+        _run_fps = -1.0
 
     if next != _anim:
         _anim = next

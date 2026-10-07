@@ -255,12 +255,13 @@ func _pass_caves(world_seed: int) -> void:
     var floor_y := height - BEDROCK_DEPTH
     for x in width:
         var sy := surface[x]
+        var denom := float(maxi(height - sy, 1))
         for y in range(sy + 4, floor_y):
             var idx := y * width + x
             if tiles[idx] == Tile.BEDROCK:
                 continue
 
-            var depth := float(y - sy) / float(maxi(height - sy, 1))
+            var depth := float(y - sy) / denom
             var worm_thr := lerpf(0.16, 0.60, clampf(depth, 0.0, 1.0))
             var a := cave_a.get_noise_2d(x, y)
             var b := cave_b.get_noise_2d(x, y)

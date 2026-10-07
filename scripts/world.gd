@@ -51,6 +51,10 @@ var slime_kills := 0
 ## One-shot HUD line set by the teleporters; cleared on regenerate.
 var hud_flash := ""
 
+## Last string pushed to the info label; _process only rebuilds the
+## label when this goes stale (see _process).
+var _hud_key := ""
+
 
 func _ready() -> void:
     _generate(SEED_NAME)
@@ -60,6 +64,7 @@ func _generate(seed_name: String) -> void:
     loading.visible = true
     status.text = "Generating world..."
     hud_flash = ""
+    _hud_key = ""
     # Let the loading screen actually paint before we block the thread.
     await get_tree().process_frame
 
@@ -71,7 +76,13 @@ func _generate(seed_name: String) -> void:
     tiles_layer.tile_set = ts
     walls_layer.tile_set = ts
 
+    # Painting with collision shapes disabled is dramatically cheaper -
+    # every painted cell would otherwise dirty a quadrant's physics. The
+    # layer is re-enabled below (before the loading screen hides), which
+    # builds the collision once instead of per paint slice.
+    tiles_layer.collision_enabled = false
     await _paint()
+    tiles_layer.collision_enabled = true
 
     player.global_position = Vector2(gen.spawn) * TILE + Vector2(TILE, TILE) * 0.5
     player.world = self
@@ -94,20 +105,23 @@ func _generate(seed_name: String) -> void:
         _teleport_to_cave()
 
 
-## Column-major so consecutive writes land near each other in memory,
-## yielding to the frame between batches to keep the window responsive.
+## Painted in 64-column slices, yielding to the frame between slices to
+## keep the window responsive. Atlas coords are cached per tile id so the
+## hot loop never recomputes them (or pays a static-call boundary) per cell.
 func _paint() -> void:
+    var coords := []  # tile id -> atlas coords
+    for id in WorldGen.TILE_COUNT:
+        coords.append(TilesetFactory.atlas_coords(id))
+
     for x in WORLD_W:
         for y in WORLD_H:
             var i := y * WORLD_W + x
             var w: int = gen.walls[i]
             if w != WorldGen.Tile.AIR:
-                walls_layer.set_cell(Vector2i(x, y), 0,
-                        TilesetFactory.atlas_coords(w))
+                walls_layer.set_cell(Vector2i(x, y), 0, coords[w])
             var t: int = gen.tiles[i]
             if t != WorldGen.Tile.AIR:
-                tiles_layer.set_cell(Vector2i(x, y), 0,
-                        TilesetFactory.atlas_coords(t))
+                tiles_layer.set_cell(Vector2i(x, y), 0, coords[t])
 
         if x % 64 == 0:
             status.text = "Painting world...  %d%%" % (x * 100 / WORLD_W)
@@ -127,6 +141,16 @@ func _process(_delta: float) -> void:
 
     var tool_text: String = player.hud_tool_text()
     var hotbar: String = player.hud_hotbar_text()
+
+    # Reformatting and re-shaping the label every frame is wasted work
+    # whenever nothing it shows has changed (most frames, standing
+    # still): skip the set entirely unless one of the fields moved.
+    var key := "%d;%d;%d;%d;%d;%d;%s;%s;%s" % [tx, ty, depth, biome,
+            player.hp, slime_kills, tool_text, hotbar, hud_flash]
+    if key == _hud_key:
+        return
+    _hud_key = key
+
     info.text = "x %5d   y %4d   depth %4d   %s   HP %d/%d   %s\n%s\nslimes slain: %d" % [
             tx, ty, depth, BIOME_NAMES[biome], player.hp, player.MAX_HP,
             tool_text, hotbar, slime_kills]

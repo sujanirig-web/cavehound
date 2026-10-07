@@ -24,6 +24,7 @@ const SCRIPTS := [
     "res://tools/dungeon_probe.gd",
     "res://tools/demo_shots.gd",
     "res://tools/mob_shots.gd",
+    "res://tools/bench_probe.gd",
     "res://tools/mouse_probe.gd",
     "res://tools/noise_probe.gd",
     "res://tools/world_png.gd",

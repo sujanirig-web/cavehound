@@ -428,6 +428,13 @@ func _expect_grounded() -> void:
 
 
 func _on_ground(node: Node2D, half_h: float) -> bool:
+    # Physics truth first: a body resting on terrain reports floor
+    # contact even when its box bottom settles a fraction of a pixel
+    # above the surface row (off a walk-through decor tile), where
+    # int() flooring the data cell would point at the decor row above
+    # the dirt and wrongly claim it floats.
+    if (node as CharacterBody2D).is_on_floor():
+        return true
     var gen: WorldGen = main.gen
     var cell := Vector2i(
             int(node.global_position.x / T),

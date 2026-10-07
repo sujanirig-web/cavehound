@@ -77,6 +77,7 @@ tools/demo_shots.gd    windowed live capture: injects input, saves screenshots
 tools/mob_shots.gd     windowed capture of slimes + villagers for inspection
 tools/mouse_probe.gd   how injected mouse events behave on this platform
 tools/tiles_probe.gd   WOOD/LEAVES atlas tiles as a colour-keyed ASCII grid
+tools/bench_probe.gd   boot perf probe: worldgen, atlas/tileset, scene boot ms
 ```
 
 ## Tests
@@ -114,6 +115,7 @@ godot --headless --path . --script res://tools/noise_probe.gd
 godot --headless --path . --script res://tools/input_dump.gd
 godot --headless --path . --script res://tools/dungeon_probe.gd
 godot --headless --path . --script res://tools/world_png.gd
+godot --headless --path . --script res://tools/bench_probe.gd   # boot perf before/after
 godot --path . --script res://tools/demo_shots.gd   # windowed, needs a display
 godot --path . -- --goto=dungeon                    # start at the dungeon gate
 godot --path . -- --goto=cave                       # start inside a cave
