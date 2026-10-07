@@ -17,8 +17,9 @@ Hit **F5**. The editor will import and register the `class_name` scripts
 on first open.
 
 No binary assets ship with the project — the tile art is painted
-procedurally at runtime by `TilesetFactory` (per-tile textures with
-speckle, cracks, bark, masonry and ore glints, not flat fills), so the
+procedurally at runtime by `TilesetFactory` (smooth-noise textures:
+shaded bark with flowing grooves, billowing feathered leaf canopies,
+plus speckle, cracks, masonry and ore glints — not flat fills), so the
 repo is pure text.
 
 ## Controls
@@ -76,7 +77,9 @@ tools/noise_probe.gd   measured min/max/mean of each noise field
 tools/demo_shots.gd    windowed live capture: injects input, saves screenshots
 tools/mob_shots.gd     windowed capture of slimes + villagers for inspection
 tools/mouse_probe.gd   how injected mouse events behave on this platform
-tools/tiles_probe.gd   WOOD/LEAVES atlas tiles as a colour-keyed ASCII grid
+tools/world_png.gd    world terrain renders (overview / spawn crop / dungeon) to /tmp
+    tools/tree_view.gd    one full generated tree at 1:1 -> /tmp/cavebound_tree.png
+    tools/tiles_probe.gd   WOOD/LEAVES atlas tiles as a colour-keyed ASCII grid
 tools/bench_probe.gd   boot perf probe: worldgen, atlas/tileset, scene boot ms
 ```
 

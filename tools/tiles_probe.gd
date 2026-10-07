@@ -12,22 +12,21 @@ const T := 16
 func _initialize() -> void:
     var atlas := TilesetFactory.build_atlas()
     _dump_tile(atlas, WorldGen.Tile.WOOD, {
-        0x8a6a3e: "+",  # lit bark chip
+        0x8a6a3e: "+",  # lit chip / knot core
         0x7d5c35: ":",  # light ridge
         0x6b4f2c: ".",  # mid bark
-        0x5a4126: "-",  # shaded edge
-        0x543d21: "-",
-        0x4f3a1f: "#",  # groove / knot / notch
-        0x4a341c: "#",
+        0x5a4126: "-",  # shaded tone
+        0x543d21: "-",  # cylinder shadow
+        0x453318: "#",  # groove
+        0x3b2c14: "#",  # crack
+        0x40301a: "#",  # knot ring
     })
     _dump_tile(atlas, WorldGen.Tile.LEAVES, {
-        0x67b24a: "+",  # sunlit fleck / cluster highlight
-        0x478c39: ".",  # light leaf
-        0x3f7a34: "*",  # deep dapple
-        0x2f6b2a: "=",  # mid leaf
-        0x2e5c26: "*",
-        0x255a22: "=",
-        0x1e4a1c: "#",  # shade leaf
+        0x8ad455: "+",  # sunlit top
+        0x4e8c38: ".",  # mid leaf
+        0x39742e: "*",  # darker pocket
+        0x2a5c24: "#",  # deep leaf
+        0x1d4218: "=",  # shaded underside
     })
     quit(0)
 

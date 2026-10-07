@@ -28,6 +28,7 @@ const SCRIPTS := [
     "res://tools/mouse_probe.gd",
     "res://tools/noise_probe.gd",
     "res://tools/world_png.gd",
+    "res://tools/tree_view.gd",
     "res://tools/world_ascii.gd",
     "res://tools/play_test.gd",
 ]

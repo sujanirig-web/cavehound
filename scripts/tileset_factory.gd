@@ -175,89 +175,93 @@ static func _paint(img: Image, id: int, ox: int, oy: int) -> void:
             _edges(img, ox, oy, Color(0, 0, 0, 0), Color("2c3a22"))
 
         WorldGen.Tile.WOOD:
-            # vertical bark: dark grooves, lit ridges, side shading so a
-            # column of trunks reads as a cylinder rather than a strip
+            # Realistic bark: a trunk cylinder lit from the left, with
+            # flowing vertical grooves whose cadence stays fixed so a
+            # multi-tile trunk reads as one continuous surface, soft
+            # horizontal crack lines, and a knot.
             _fill(img, ox, oy, Color("6b4f2c"))
-            for gx in [1, 5, 9, 13]:
-                for y in TILE_SIZE:
-                    if rng.randf() < 0.75:
-                        _px(img, ox + gx, oy + y, Color("4f3a1f"))
-            for gx in [3, 7, 11]:
-                for y in TILE_SIZE:
-                    if rng.randf() < 0.5:
-                        _px(img, ox + gx, oy + y, Color("7d5c35"))
+            var nf := _noise_field(rng, 5)
+            var kx := rng.randi_range(4, 11)
+            var ky := rng.randi_range(4, 11)
             for y in TILE_SIZE:
-                _px(img, ox, oy + y, Color("5a4126"))
-                _px(img, ox + TILE_SIZE - 1, oy + y, Color("543d21"))
-            # a knot: dark ring with a lit core
-            var kx := rng.randi_range(3, 11)
-            var ky := rng.randi_range(3, 11)
-            for dx in range(2):
-                for dy in range(2):
-                    _px(img, ox + kx + dx, oy + ky + dy, Color("4f3a1f"))
-            _px(img, ox + kx, oy + ky, Color("7d5c35"))
-            # horizontal notches: break the grooves into chunky bark
-            # rings, the way a real trunk grows, not a stripy strip
-            for i in 3:
-                var nx := rng.randi_range(2, 11)
-                var ny := rng.randi_range(2, 13)
-                for lx in rng.randi_range(3, 5):
-                    _px(img, ox + nx + lx, oy + ny, Color("4a341c"))
-                    _px(img, ox + nx + lx, oy + ny + 1, Color("6b4f2c"))
-            # a few lit ridge chips so the bark surface reads rough
+                # Grooves wander a pixel or two per row, bark-style, but
+                # stay at the same cadence (x ~ 2/7/12) so trunks don't
+                # look sliced into strips at tile boundaries.
+                var wob := int(round(_smooth(nf, 5, 4, y) * 4.0 - 2.0))
+                var crack := _smooth(nf, 5, 0, y)
+                for x in TILE_SIZE:
+                    var t := float(x) / float(TILE_SIZE - 1)
+                    if crack < 0.14 and x > 0 and x < TILE_SIZE - 1:
+                        # a soft crack line gouged into the bark
+                        _px(img, ox + x, oy + y, Color("3b2c14"))
+                    elif x == 2 + wob or x == 7 + wob or x == 12 + wob:
+                        _px(img, ox + x, oy + y, Color("453318"))
+                    elif t > 0.80:
+                        # cylinder shadow rolling off the right edge
+                        _px(img, ox + x, oy + y, Color("543d21"))
+                    else:
+                        var n := _smooth(nf, 5, x, y)
+                        if n < 0.33:
+                            _px(img, ox + x, oy + y, Color("5a4126"))
+                        elif n > 0.70:
+                            _px(img, ox + x, oy + y, Color("7d5c35"))
+                        else:
+                            _px(img, ox + x, oy + y, Color("6b4f2c"))
+            # a knot: dark ring with a lit core, softened into an ellipse
+            for dy in range(-3, 4):
+                for dx in range(-3, 4):
+                    if dx * dx + dy * dy * 2 >= 1 and dx * dx + dy * dy * 2 <= 8 \
+                            and img.get_pixel(ox + kx + dx, oy + ky + dy).a > 0.0:
+                        _px(img, ox + kx + dx, oy + ky + dy, Color("40301a"))
+            _px(img, ox + kx, oy + ky, Color("8a6a3e"))
+            # a few lit chips so the bark surface reads rough, not painted
             for i in 3:
                 _px(img, ox + rng.randi_range(2, 12), oy + rng.randi_range(1, 14),
                         Color("8a6a3e"))
-            _edges(img, ox, oy, Color("7d5c35"), Color("453218"))
+            _edges(img, ox, oy, Color("7d5c35"), Color("40301a"))
 
         WorldGen.Tile.LEAVES:
-            # Three tones plus ragged transparent borders: neighbouring
-            # tiles then merge into an organic canopy instead of a
-            # green brick wall.
+            # Two overlapping leafy blobs per tile with a feathered, noisy
+            # edge: neighbouring tiles merge into one billowing canopy —
+            # no fixed tone bands, no 2x2 pixel clusters. Light falls from
+            # above, so the mass shades from sunlit top to deep green
+            # bottom, with darker pockets where the blobs overlap.
+            var nf := _noise_field(rng, 5)
+            var b1 := Vector2(rng.randf_range(4.0, 11.0), rng.randf_range(4.0, 11.0))
+            var r1 := rng.randf_range(5.5, 8.0)
+            var b2 := Vector2(rng.randf_range(4.0, 11.0), rng.randf_range(4.0, 11.0))
+            var r2 := rng.randf_range(5.5, 8.0)
             for y in TILE_SIZE:
                 for x in TILE_SIZE:
-                    var border := x == 0 or y == 0 \
-                            or x == TILE_SIZE - 1 or y == TILE_SIZE - 1
-                    var corner := (x == 0 or x == TILE_SIZE - 1) \
-                            and (y == 0 or y == TILE_SIZE - 1)
-                    if border and rng.randf() < (0.55 if corner else 0.30):
-                        _px(img, ox + x, oy + y, Color(0, 0, 0, 0))
-                        continue
-                    var d := x + y  # light falls from the top-left
-                    var roll := rng.randf()
-                    if d < 10 and roll < 0.40:
-                        _px(img, ox + x, oy + y, Color("478c39"))
-                    elif d > 20 and roll < 0.45:
-                        _px(img, ox + x, oy + y, Color("1e4a1c"))
-                    elif roll < 0.75:
-                        _px(img, ox + x, oy + y, Color("255a22"))
+                    var p := Vector2(float(x) + 0.5, float(y) + 0.5)
+                    var dd := minf(p.distance_to(b1) / r1, p.distance_to(b2) / r2)
+                    if dd > 1.4:
+                        continue  # canopy gap: stay transparent
+                    var n := _smooth(nf, 5, x, y)
+                    var alpha := 1.0
+                    if dd > 0.95:
+                        # feathered fringe rippled by noise so the outline
+                        # is ragged like real foliage, not a smooth circle
+                        alpha = clampf((1.4 - dd) / 0.45 * (0.55 + n * 0.45),
+                                0.0, 1.0)
+                        if alpha < 0.05:
+                            continue
+                    var sun := 1.0 - float(y) / float(TILE_SIZE - 1) * 0.55
+                    var v := clampf(sun - 0.45 + n, 0.0, 1.0)
+                    var c: Color
+                    if v > 0.76:
+                        c = Color("8ad455")  # sunlit top
+                    elif v > 0.50:
+                        c = Color("4e8c38")  # mid leaf
+                    elif v > 0.28:
+                        c = Color("2a5c24")  # deep leaf
                     else:
-                        _px(img, ox + x, oy + y, Color("2f6b2a"))
-            # a couple of holes punched through the interior
-            for i in 3:
-                _px(img, ox + rng.randi_range(2, 13), oy + rng.randi_range(2, 13),
-                        Color(0, 0, 0, 0))
-            # dappled speckles: Terraria foliage reads as thousands of
-            # tiny deep/sunlit flecks over the mid green, not tone bands
-            for i in 12:
-                var ddx := rng.randi_range(1, 14)
-                var ddy := rng.randi_range(1, 14)
-                if img.get_pixel(ox + ddx, oy + ddy).a == 0.0:
-                    continue
-                _px(img, ox + ddx, oy + ddy, Color("3f7a34"))
-            for i in 8:
-                var ddx := rng.randi_range(1, 14)
-                var ddy := rng.randi_range(1, 14)
-                if img.get_pixel(ox + ddx, oy + ddy).a == 0.0:
-                    continue
-                _px(img, ox + ddx, oy + ddy, Color("67b24a"))
-            for i in 3:
-                var bdx := rng.randi_range(1, 12)
-                var bdy := rng.randi_range(1, 12)
-                _px(img, ox + bdx, oy + bdy, Color("2e5c26"))
-                _px(img, ox + bdx + 1, oy + bdy, Color("3f7a34"))
-                _px(img, ox + bdx, oy + bdy + 1, Color("2e5c26"))
-                _px(img, ox + bdx + 1, oy + bdy + 1, Color("67b24a"))
+                        c = Color("1d4218")  # shaded underside
+                    if dd < 0.6 and n > 0.78:
+                        c = Color("39742e")  # darker pocket in the dense mass
+                    if alpha < 1.0:
+                        c = Color(c.r, c.g, c.b, alpha)
+                    _px(img, ox + x, oy + y, c)
 
         WorldGen.Tile.COPPER:
             _stone_base(img, ox, oy, rng)
@@ -483,6 +487,34 @@ static func _speckle(img: Image, ox: int, oy: int, count: int, c: Color,
         rng: RandomNumberGenerator) -> void:
     for _i in count * 4:
         _px(img, ox + rng.randi_range(0, 15), oy + rng.randi_range(0, 15), c)
+
+
+## Smooth value-noise for organic textures: a small seeded grid,
+## bilinearly interpolated. Volatile per-pixel randoms read as static;
+## fields like this read as bark, foliage clumps and rock.
+static func _noise_field(rng: RandomNumberGenerator, n: int) -> Array[float]:
+    var g: Array[float] = []
+    g.resize(n * n)
+    for i in n * n:
+        g[i] = rng.randf()
+    return g
+
+
+## Sample the n x n noise field at tile-space (x, y) in [0, TILE_SIZE-1].
+static func _smooth(g: Array[float], n: int, x: int, y: int) -> float:
+    var fx := float(x) / float(TILE_SIZE - 1) * float(n - 1)
+    var fy := float(y) / float(TILE_SIZE - 1) * float(n - 1)
+    var x0 := mini(int(fx), n - 1)
+    var y0 := mini(int(fy), n - 1)
+    var x1 := mini(x0 + 1, n - 1)
+    var y1 := mini(y0 + 1, n - 1)
+    var tx := fx - float(x0)
+    var ty := fy - float(y0)
+    var a := g[y0 * n + x0]
+    var b := g[y0 * n + x1]
+    var c := g[y1 * n + x0]
+    var d := g[y1 * n + x1]
+    return lerpf(lerpf(a, b, tx), lerpf(c, d, tx), ty)
 
 
 static func _px(img: Image, x: int, y: int, c: Color) -> void:
