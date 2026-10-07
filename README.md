@@ -66,6 +66,7 @@ tools/world_png.gd     renders a world to PNG (overview/crop/dungeon)
 tools/noise_probe.gd   measured min/max/mean of each noise field
 tools/demo_shots.gd    windowed live capture: injects input, saves screenshots
 tools/mouse_probe.gd   how injected mouse events behave on this platform
+tools/tiles_probe.gd   WOOD/LEAVES atlas tiles as a colour-keyed ASCII grid
 ```
 
 ## Tests
@@ -115,12 +116,14 @@ godot --path . -- --goto=cave                       # start inside a cave
    depth-widening threshold. Requiring *both* fields near zero is what
    makes long connected tunnels instead of disconnected blobs.
 4. **Ores** — depth-gated random-walk deposits (copper shallow, gold deep).
-5. **Trees** — density per biome. Terraria-style: a straight 1-tile
-   trunk that reaches the ground (trees never cut into hillsides - a
-   blocked column is skipped rather than truncated), a ragged round
-   canopy grown around the trunk top (leaves only fill air, so the
-   trunk stays visible up through the crown), and 0-2 side branches
-   ending in leaf puffs. 9-15 tiles tall.
+5. **Trees** — density per biome. Terraria-style: a trunk that flares
+   2-wide where it leaves the ground and tapers to 1 tile (the flare
+   needs flat ground, so slopes get plain trunks), a wide round crown
+   grown around the trunk top with a ragged fringe and leaves that
+   droop into a bell shape under the flanks, and 0-2 side branches
+   ending in leaf puffs. Leaves only fill air, so the trunk stays
+   visible up through the crown and trees never cut into hillsides - a
+   blocked column is skipped rather than truncated. 9-15 tiles tall.
 6. **Foliage** — grass tufts, wild grass and flowers scattered in the
    air cell directly above grassy/muddy ground. Decorative only
    (`NON_SOLID`), so it can never float, bury itself, or block walking.

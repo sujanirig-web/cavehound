@@ -310,8 +310,9 @@ func _pass_ores(rng: RandomNumberGenerator) -> void:
 
 # ---------------------------------------------------------------- pass 5
 
-## Terraria-style trees: a straight 1-tile trunk that actually reaches
-## the ground, a big ragged canopy around the trunk top, and 0-2 small
+## Terraria-style trees: a trunk that flares to 2 tiles wide where it
+## leaves the ground then tapers to 1 tile, a wide round canopy with a
+## ragged fringe and a drooping curtain under the flanks, and 0-2 small
 ## branches ending in their own leaf puffs.
 ##
 ## Height is total (apex to ground): 9-15 tiles, which puts the canopy
@@ -340,38 +341,56 @@ func _pass_trees(rng: RandomNumberGenerator) -> void:
 func _place_tree(x: int, ground_y: int, rng: RandomNumberGenerator) -> void:
     var hgt := rng.randi_range(9, 15)
     var top_y := ground_y - hgt
-    var rx := rng.randf_range(3.4, 4.6)
-    var ry := rng.randf_range(2.6, 3.4)
+    var rx := rng.randf_range(3.8, 5.0)
+    var ry := rng.randf_range(2.8, 3.6)
     var canopy_r := ceili(ry)
     var cy := top_y + canopy_r  # canopy centre: apex row lands exactly on top_y
 
-    # Every trunk cell, ground to apex, must be air - or the tree is
-    # skipped entirely. Trees never cut into a hillside, and pre-checking
-    # means a blocked tree leaves nothing behind instead of a stub.
+    # Classic Terraria trunk: a 2-wide flare where the trunk leaves the
+    # ground, tapering to 1-wide above, with the flare side randomised.
+    # Every cell is pre-checked first, so a blocked tree leaves nothing
+    # behind instead of a stub.
+    var flare_dir := 1 if rng.randf() < 0.5 else -1
+    # The flare needs flat ground on its side: flaring onto a slope would
+    # hang a wood chunk two rows above the lower neighbour's surface and
+    # trip the floating-trunk invariant.
+    if surface[x + flare_dir] != ground_y:
+        return
+    if x + flare_dir <= 1 or x + flare_dir >= width - 1:
+        return
     for y in range(ground_y - 1, top_y - 1, -1):
         if _tile_at(x, y) != Tile.AIR:
             return
+    for y in range(ground_y - 1, ground_y - 3, -1):
+        if _tile_at(x + flare_dir, y) != Tile.AIR:
+            return
     for y in range(ground_y - 1, top_y - 1, -1):
         _put(x, y, Tile.WOOD)
+    for y in range(ground_y - 1, ground_y - 3, -1):
+        _put(x + flare_dir, y, Tile.WOOD)
 
-    # Canopy: ragged ellipse centred on the trunk top. Leaves only ever
-    # fill air, so the trunk column stays WOOD - the crown grows around
-    # the trunk and terrain clips it naturally.
-    for dy in range(-canopy_r, canopy_r + 1):
-        for dx in range(-ceili(rx), ceili(rx) + 1):
+    # Canopy: a wide, round Terraria crown. Dense inside the ellipse,
+    # a ragged fringe wandering past the outline, and a curtain of
+    # leaves drooping below the flanks so the crown is a bell, not an
+    # oval. Leaves only ever fill air, so the trunk column stays WOOD
+    # and terrain clips the crown. The rim sits three rows above the
+    # ground so even short trees keep a visible trunk.
+    for dy in range(-canopy_r, canopy_r + 3):
+        for dx in range(-ceili(rx) - 1, ceili(rx) + 2):
             var u := float(dx) / rx
             var v := float(dy) / ry
             var f := u * u + v * v
-            var edge := 1.0
-            var chance := 1.0
-            if f > 1.0:
-                # Fringe: sparse tufts past the smooth outline, so the
-                # canopy silhouette is ragged like Terraria's instead of
-                # a clean oval.
-                edge = 1.5
-                chance = 0.20
-            if f <= edge and rng.randf() < chance \
-                    and _tile_at(x + dx, cy + dy) == Tile.AIR:
+            if cy + dy > ground_y - 3:
+                continue
+            var in_crown := f <= 1.0
+            if not in_crown and f <= 1.6 and rng.randf() < 0.22:
+                in_crown = true  # ragged fringe past the smooth outline
+            if not in_crown and dy >= canopy_r + 1 \
+                    and absf(float(dx)) > rx * 0.5 \
+                    and absf(float(dx)) <= rx + 1.0 \
+                    and rng.randf() < 0.55:
+                in_crown = true  # drooping curtain under the flanks
+            if in_crown and _tile_at(x + dx, cy + dy) == Tile.AIR:
                 _put(x + dx, cy + dy, Tile.LEAVES)
 
     _place_branches(x, ground_y, top_y, canopy_r, rng)

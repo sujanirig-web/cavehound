@@ -196,6 +196,18 @@ static func _paint(img: Image, id: int, ox: int, oy: int) -> void:
                 for dy in range(2):
                     _px(img, ox + kx + dx, oy + ky + dy, Color("4f3a1f"))
             _px(img, ox + kx, oy + ky, Color("7d5c35"))
+            # horizontal notches: break the grooves into chunky bark
+            # rings, the way a real trunk grows, not a stripy strip
+            for i in 3:
+                var nx := rng.randi_range(2, 11)
+                var ny := rng.randi_range(2, 13)
+                for lx in rng.randi_range(3, 5):
+                    _px(img, ox + nx + lx, oy + ny, Color("4a341c"))
+                    _px(img, ox + nx + lx, oy + ny + 1, Color("6b4f2c"))
+            # a few lit ridge chips so the bark surface reads rough
+            for i in 3:
+                _px(img, ox + rng.randi_range(2, 12), oy + rng.randi_range(1, 14),
+                        Color("8a6a3e"))
             _edges(img, ox, oy, Color("7d5c35"), Color("453218"))
 
         WorldGen.Tile.LEAVES:
@@ -225,6 +237,27 @@ static func _paint(img: Image, id: int, ox: int, oy: int) -> void:
             for i in 3:
                 _px(img, ox + rng.randi_range(2, 13), oy + rng.randi_range(2, 13),
                         Color(0, 0, 0, 0))
+            # dappled speckles: Terraria foliage reads as thousands of
+            # tiny deep/sunlit flecks over the mid green, not tone bands
+            for i in 12:
+                var ddx := rng.randi_range(1, 14)
+                var ddy := rng.randi_range(1, 14)
+                if img.get_pixel(ox + ddx, oy + ddy).a == 0.0:
+                    continue
+                _px(img, ox + ddx, oy + ddy, Color("3f7a34"))
+            for i in 8:
+                var ddx := rng.randi_range(1, 14)
+                var ddy := rng.randi_range(1, 14)
+                if img.get_pixel(ox + ddx, oy + ddy).a == 0.0:
+                    continue
+                _px(img, ox + ddx, oy + ddy, Color("67b24a"))
+            for i in 3:
+                var bdx := rng.randi_range(1, 12)
+                var bdy := rng.randi_range(1, 12)
+                _px(img, ox + bdx, oy + bdy, Color("2e5c26"))
+                _px(img, ox + bdx + 1, oy + bdy, Color("3f7a34"))
+                _px(img, ox + bdx, oy + bdy + 1, Color("2e5c26"))
+                _px(img, ox + bdx + 1, oy + bdy + 1, Color("67b24a"))
 
         WorldGen.Tile.COPPER:
             _stone_base(img, ox, oy, rng)
