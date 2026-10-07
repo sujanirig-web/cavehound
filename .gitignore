@@ -1,0 +1,13 @@
+.godot/
+.import/
+export.cfg
+export_presets.cfg
+*.translation
+build/
+*.x86_64
+*.pck
+
+# Zero binary assets: all art is generated at runtime by TilesetFactory /
+# PlayerArt. Ignore stray images and their importer metadata.
+*.png
+*.import
