@@ -8,7 +8,7 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 run() {
     echo
     echo "############ $1 ############"
-    "$GODOT" --headless --path "$DIR" --script "$2"
+    "$GODOT" --headless --path "$DIR" --script "$2" "${@:3}"
 }
 
 # The class_name globals (WorldGen, TilesetFactory) only resolve once
@@ -23,8 +23,9 @@ echo "############ import ############"
 run "parse check" "res://tools/parse_check.gd"
 run "player sprite art" "res://tools/sprite_test.gd"
 run "worldgen invariants" "res://tools/gen_test.gd"
-run "player physics / collision" "res://tools/play_test.gd"
-run "digging / building" "res://tools/dig_test.gd"
+run "player physics / collision" "res://tools/play_test.gd" -- --no-creatures
+run "digging / building" "res://tools/dig_test.gd" -- --no-creatures
+run "mobs + npcs" "res://tools/mob_test.gd"
 
 echo
 echo "############ boot smoke test ############"

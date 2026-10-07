@@ -1,0 +1,16 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/mob.gd" id="1_mob"]
+
+[sub_resource type="RectangleShape2D" id="shape_slime"]
+size = Vector2(12, 10)
+
+[node name="Mob" type="CharacterBody2D"]
+gravity_scale = 0.0
+script = ExtResource("1_mob")
+
+[node name="Collision" type="CollisionShape2D" parent="."]
+shape = SubResource("shape_slime")
+
+[node name="Sprite" type="AnimatedSprite2D" parent="."]
+offset = Vector2(0, -3)

@@ -5,8 +5,10 @@ build — the project is **GDScript only**, no C#/.NET (so no mono-specific addo
 
 ## Before writing code
 
-- Run `./run_tests.sh` after any script/scene change. Six suites: parse check,
-  sprite art, worldgen invariants + dungeon, physics, dig/build, boot smoke.
+- Run `./run_tests.sh` after any script/scene change. Seven suites: parse check,
+  sprite art, worldgen invariants + dungeon, physics, dig/build, mobs & npcs, boot smoke.
+  (`play_test`/`dig_test` run with `--no-creatures` so legacy movement/digging
+  expectations see a clean world; the mob suite and real boots keep creatures.)
 - The repo is pure text: all tile art is painted procedurally at runtime by
   `scripts/tileset_factory.gd`. Never add binary assets.
 - World generation must stay deterministic: same seed → same world

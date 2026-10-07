@@ -1,7 +1,9 @@
 extends CharacterBody2D
 
 ## Milestone-1 player: run, jump, variable jump height - plus digging
-## and building with tools.
+## and building with tools, and (milestone 3) health + a melee swing
+## that works exactly like digging: LMB on a mob hits it, LMB on a tile
+## digs it.
 ##
 ## Gravity is applied manually so the constant stays next to the other
 ## movement numbers and tuning is one place. The scene sets
@@ -21,6 +23,12 @@ const JUMP_CUT := 0.45
 ## Animation speed floor: below this the run cycle looks like a twitch.
 const RUN_ANIM_MIN := 20.0
 
+## Health / melee tuning.
+const MAX_HP := 10
+const MELEE_DAMAGE := 2
+const MELEE_CD := 0.35
+const IFRAME_TIME := 1.0
+
 const TILE := TilesetFactory.TILE_SIZE
 const SLOT_COUNT := 4
 
@@ -39,14 +47,19 @@ var active_tool := Tools.DEFAULT
 var inventory := {}
 var selected_item := -1
 
+var hp := MAX_HP
+
 var _anim := "idle"
 var _mine_target := Vector2i(-9999, -9999)
 var _mine_progress := 0.0
 var _swinging := false
 var _swing_t := 0.0
+var _iframes := 0.0
+var _melee_cd := 0.0
 
 
 func _ready() -> void:
+    add_to_group("player")
     sprite.sprite_frames = PlayerArt.build_frames()
     sprite.play(_anim)
     # The cursor draws in raw world coordinates, not player-relative.
@@ -76,7 +89,17 @@ func _physics_process(delta: float) -> void:
     move_and_slide()
     _animate(delta)
     _tool_tick(delta)
+    _melee_tick(delta)
     _update_tool_pose(delta)
+
+    # Hurt flash: red for the first beat of the i-frame window, then back
+    # to the normal palette.
+    _iframes = maxf(_iframes - delta, 0.0)
+    _melee_cd = maxf(_melee_cd - delta, 0.0)
+    if _iframes > IFRAME_TIME - 0.15:
+        sprite.modulate = Color(1, 0.45, 0.45)
+    elif sprite.modulate != Color.WHITE:
+        sprite.modulate = Color.WHITE
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -110,7 +133,8 @@ func _animate(delta: float) -> void:
 # ------------------------------------------------------------------ tools
 
 ## Called every physics frame: cycles tools/slots, mines while the left
-## button is held, and keeps the aim cursor in sync.
+## button is held, and keeps the aim cursor in sync. A mob under the
+## cursor suppresses digging - LMB means "hit the critter" there.
 func _tool_tick(delta: float) -> void:
     if world == null or world.gen == null:
         return
@@ -122,6 +146,7 @@ func _tool_tick(delta: float) -> void:
             select_slot(s + 1)
 
     var mouse := get_global_mouse_position()
+    var mob: Node = world.mob_at(mouse)
     var target := Vector2i(
             floori(mouse.x / float(TILE)), floori(mouse.y / float(TILE)))
     var id := _tile_at(target)
@@ -133,6 +158,7 @@ func _tool_tick(delta: float) -> void:
         _mine_target = target
         _swinging = false
     elif Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) \
+            and mob == null \
             and Tools.is_diggable(id):
         if target != _mine_target:
             _mine_target = target
@@ -201,6 +227,56 @@ func _tile_at(cell: Vector2i) -> int:
 func _within_reach(cell: Vector2i) -> bool:
     var center := Vector2(cell) * TILE + Vector2(TILE, TILE) * 0.5
     return global_position.distance_to(center) <= Tools.REACH_TILES * TILE
+
+
+# --------------------------------------------------------- health/melee
+
+## Melee: while LMB is held, hit whatever mob is under the cursor, on a
+## cooldown so a held click doesn't machine-gun.
+func _melee_tick(delta: float) -> void:
+    if world == null or world.gen == null:
+        return
+    _melee_cd = maxf(_melee_cd - delta, 0.0)
+    if _melee_cd > 0.0 or not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+        return
+    if attack_mob_at(get_global_mouse_position()):
+        _melee_cd = MELEE_CD
+
+
+## Shared melee path: a reachable mob under pos takes MELEE_DAMAGE and is
+## knocked away. Returns true when something was hit. The test suite
+## calls this directly the way it calls dig_at().
+func attack_mob_at(pos: Vector2) -> bool:
+    if world == null or world.gen == null:
+        return false
+    if global_position.distance_to(pos) > Tools.REACH_TILES * TILE:
+        return false
+    var mob = world.mob_at(pos)
+    if mob == null:
+        return false
+    sprite.flip_h = pos.x < global_position.x
+    mob.take_damage(MELEE_DAMAGE, global_position)
+    return true
+
+
+## Mob contact / fall damage land here. I-frames stop the hits stacking.
+func take_damage(amount: int) -> void:
+    if _iframes > 0.0:
+        return
+    hp = maxi(hp - amount, 0)
+    _iframes = IFRAME_TIME
+    if hp <= 0:
+        die()
+
+
+func die() -> void:
+    if world != null and world.has_method("respawn_player"):
+        world.respawn_player()
+
+
+func heal_full() -> void:
+    hp = MAX_HP
+    _iframes = 0.0
 
 
 func select_slot(n: int) -> void:

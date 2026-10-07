@@ -4,11 +4,14 @@ extends Node2D
 ## drops the player at spawn, and runs the HUD.
 ##
 ## Controls: arrows / A-D to move, Space to jump,
-##           hold LMB to dig, RMB to place the selected block,
+##           hold LMB to dig (or hit a mob under the cursor),
+##           RMB to place the selected block,
 ##           Q switch tool, 1-4 pick a hotbar slot,
+##           E talk to a nearby npc,
 ##           F toggle background walls, G new seed,
 ##           T jump to the dungeon gate, C drop into a cave.
-## Launch with `-- --goto=dungeon` (or `--goto=cave`) to start there.
+## Launch with `-- --goto=dungeon` (or `--goto=cave`) to start there, or
+## `-- --no-creatures` for a world without slimes/npcs (used by tests).
 
 const WORLD_W := 1600
 const WORLD_H := 400
@@ -16,6 +19,23 @@ const TILE := 16
 const SEED_NAME := "cavebound"
 
 const BIOME_NAMES := ["Plains", "Forest", "Desert", "Jungle", "Tundra"]
+
+const MOB_SCENE := preload("res://scenes/mob.tscn")
+const NPC_SCENE := preload("res://scenes/npc.tscn")
+
+## Walk-through decorative tiles that may sit right above the ground row.
+const DECOR := [
+    WorldGen.Tile.GRASS_TUFT,
+    WorldGen.Tile.WILD_GRASS,
+    WorldGen.Tile.FLOWER,
+]
+
+## Creatures populating a generated world. Layout is derived from the
+## world seed, so the same seed always spawns the same slimes/npcs.
+const SLIME_COUNT := 8
+const NPC_COUNT := 2
+const MOB_HALF_H := 5.0   # half the slime's collision box height
+const NPC_HALF_H := 11.0  # half the villager's collision box height
 
 @onready var tiles_layer: TileMapLayer = $World/Tiles
 @onready var walls_layer: TileMapLayer = $World/Walls
@@ -26,6 +46,7 @@ const BIOME_NAMES := ["Plains", "Forest", "Desert", "Jungle", "Tundra"]
 
 var gen: WorldGen
 var world_seed := 0
+var slime_kills := 0
 
 ## One-shot HUD line set by the teleporters; cleared on regenerate.
 var hud_flash := ""
@@ -62,6 +83,9 @@ func _generate(seed_name: String) -> void:
     cam.reset_smoothing()
 
     loading.visible = false
+
+    if not OS.get_cmdline_user_args().has("--no-creatures"):
+        spawn_creatures()
 
     var args := OS.get_cmdline_user_args()
     if args.has("--goto=dungeon"):
@@ -103,8 +127,9 @@ func _process(_delta: float) -> void:
 
     var tool_text: String = player.hud_tool_text()
     var hotbar: String = player.hud_hotbar_text()
-    info.text = "x %5d   y %4d   depth %4d   %s   %s\n%s" % [
-        tx, ty, depth, BIOME_NAMES[biome], tool_text, hotbar]
+    info.text = "x %5d   y %4d   depth %4d   %s   HP %d/%d   %s\n%s\nslimes slain: %d" % [
+            tx, ty, depth, BIOME_NAMES[biome], player.hp, player.MAX_HP,
+            tool_text, hotbar, slime_kills]
     if hud_flash != "":
         info.text += "\n" + hud_flash
 
@@ -165,12 +190,142 @@ func _unhandled_input(event: InputEvent) -> void:
                 _teleport_to_dungeon()
             KEY_C:
                 _teleport_to_cave()
+            KEY_E:
+                talk_nearby()
             KEY_F:
                 walls_layer.visible = not walls_layer.visible
             KEY_G:
                 tiles_layer.clear()
                 walls_layer.clear()
                 _generate("cavebound-%d" % randi())
+
+
+# ------------------------------------------------------------- creatures
+
+## Populate the world: a spread of slimes across the surface either side
+## of spawn plus a couple of friendly villagers near spawn. Derives
+## every spot from the world seed so the same seed gives the same world,
+## and refuses tree trunks, hillsides and the spawn column itself.
+func spawn_creatures() -> void:
+    clear_creatures()
+    if gen == null:
+        return
+    var rng := RandomNumberGenerator.new()
+    rng.seed = world_seed
+    var spawn_x: int = gen.spawn.x
+    var used := {}
+
+    var placed := 0
+    var guard := 0
+    while placed < SLIME_COUNT and guard < 400:
+        guard += 1
+        var x := spawn_x + rng.randi_range(-350, 350)
+        if x < 2 or x >= gen.width - 2 or absi(x - spawn_x) < 8 \
+                or used.has(x):
+            continue
+        var sy: int = gen.surface[x]
+        if not _surface_spot(x, sy):
+            continue
+        _spawn_slime(x, sy)
+        used[x] = true
+        placed += 1
+
+    var village := [spawn_x - 20, spawn_x + 32]
+    var npc_done := 0
+    guard = 0
+    var side := 0
+    while npc_done < NPC_COUNT and guard < 80:
+        guard += 1
+        var x: int = village[side % village.size()]
+        side += 1
+        if x < 2 or x >= gen.width - 2:
+            continue
+        var sy: int = gen.surface[x]
+        if _surface_spot(x, sy) and npc_done < NPC_COUNT:
+            _spawn_npc(x, sy)
+            npc_done += 1
+
+
+func clear_creatures() -> void:
+    for m in get_tree().get_nodes_in_group("mobs"):
+        m.queue_free()
+    for n in get_tree().get_nodes_in_group("npcs"):
+        n.queue_free()
+
+
+## A valid creature spot: solid ground with two clear rows above (grass
+## tufts / flowers count as clear - they're walk-through decor), so
+## nothing spawns inside a trunk, under a ledge, or in the sky.
+func _surface_spot(x: int, sy: int) -> bool:
+    if sy < 8 or sy >= gen.height - 4:
+        return false
+    var ground: int = gen.tiles[sy * gen.width + x]
+    if not TilesetFactory.SOLID.has(ground):
+        return false
+    var above: int = gen.tiles[(sy - 1) * gen.width + x]
+    if above != WorldGen.Tile.AIR and not DECOR.has(above):
+        return false
+    if gen.tiles[(sy - 2) * gen.width + x] != WorldGen.Tile.AIR:
+        return false
+    return true
+
+
+func _spawn_slime(x: int, sy: int) -> void:
+    var mob := MOB_SCENE.instantiate() as CharacterBody2D
+    mob.world = self
+    $Entities.add_child(mob)
+    # Park the collision box bottom exactly on the floor line.
+    mob.global_position = Vector2((x + 0.5) * TILE, sy * TILE - MOB_HALF_H)
+
+
+func _spawn_npc(x: int, sy: int) -> void:
+    var npc := NPC_SCENE.instantiate() as CharacterBody2D
+    npc.world = self
+    $Entities.add_child(npc)
+    npc.global_position = Vector2((x + 0.5) * TILE, sy * TILE - NPC_HALF_H)
+    # _ready() already ran (add_child) before the position was set, so the
+    # villager's wander anchor must be handed to it from the spawn point.
+    npc.anchor = npc.global_position
+
+
+## Nearest mob within ~3/4 tile of a world point, or null.
+func mob_at(pos: Vector2) -> Node:
+    for m in get_tree().get_nodes_in_group("mobs"):
+        if (m as Node2D).global_position.distance_to(pos) <= 12.0:
+            return m
+    return null
+
+
+## A mob died: count the kill and flash the HUD. (Slime gel drops can
+## hang off this hook later.)
+func on_mob_killed(_mob: Node) -> void:
+    slime_kills += 1
+    hud_flash = "Slime slain!  (%d slain)" % slime_kills
+
+
+## E next to a villager: cycle one of its lines into the HUD.
+func talk_nearby() -> bool:
+    if player == null or player.world == null:
+        return false
+    var best: Node = null
+    var best_d := INF
+    for n in get_tree().get_nodes_in_group("npcs"):
+        var d: float = (n as Node2D).global_position.distance_to(player.global_position)
+        if d < best_d:
+            best_d = d
+            best = n
+    if best == null or best_d > TILE * 4.0:
+        return false
+    hud_flash = best.talk()
+    return true
+
+
+## Player died: back to spawn at full health.
+func respawn_player() -> void:
+    player.heal_full()
+    _stand_on(gen.spawn.x, gen.surface[gen.spawn.x])
+    _snap_camera()
+    hud_flash = "You died... and woke up at spawn"
 
 
 # ------------------------------------------------------------- teleporting

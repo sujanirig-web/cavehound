@@ -1,7 +1,8 @@
 # Cavebound
 
-A Terraria-like 2D sandbox. **Milestone 2: world generation, walking,
-and dig/build with tools, plus procedural caves and dungeons.**
+A Terraria-like 2D sandbox. **Milestone 3: world generation, walking,
+dig/build with tools, procedural caves and dungeons, and slime mobs +
+friendly villagers.**
 
 Requires **Godot 4.3+** (uses `TileMapLayer`).
 
@@ -26,10 +27,11 @@ repo is pure text.
 |---|---|
 | **A / D** or **Left / Right** | Move |
 | **W**, **Up**, or **Space** | Jump (hold for height) |
-| **Hold LMB** | Dig the tile under the cursor (within reach) |
+| **Hold LMB** | Whack a slime under the cursor - or dig the tile under the cursor when no mob is there |
 | **RMB** | Place the selected block on a supported spot |
 | **Q** | Cycle the held tool (pickaxe ↔ axe) |
 | **1-4** | Pick a hotbar slot |
+| **E** | Talk to a nearby villager (next line in the HUD) |
 | **T** | Teleport to the dungeon gate |
 | **C** | Drop into the nearest cave |
 | **F** | Toggle background walls |
@@ -49,22 +51,30 @@ scripts/world_gen.gd       generation passes (only engine dep is FastNoiseLite)
 scripts/tileset_factory.gd paints the TileSet art in code (textured, not flat)
 scripts/tools.gd           tool + mining table (what digs what, how fast)
 scripts/target_cursor.gd   aim outline + mining progress fill
-scripts/player.gd          CharacterBody2D controller, dig/build, inventory
+scripts/player.gd          CharacterBody2D controller, dig/build, health, melee
 scripts/player_art.gd      procedural character frames + held tools
-scripts/world.gd           scene wiring, world painting, HUD
+scripts/mob.gd             slime AI: aggro hop, contact damage, knockback, death
+scripts/mob_art.gd         procedural slime frames (squash/stretch hop cycle)
+scripts/npc.gd             villager: bounded wander + scripted talk lines
+scripts/npc_art.gd         procedural hooded-villager frames
+scripts/world.gd           scene wiring, world painting, creature spawner, HUD
 scenes/main.tscn           root scene
 scenes/player.tscn         player + camera
+scenes/mob.tscn            slime body (CharacterBody2D + collision + sprite)
+scenes/npc.tscn            villager body
 
 tools/parse_check.gd   loads every script + scene, fails on parse errors
 tools/sprite_test.gd   procedural sprite frames and their wiring
 tools/gen_test.gd      worldgen stats + invariant assertions (incl. dungeon)
 tools/play_test.gd     boots the scene, asserts tile collision and movement
 tools/dig_test.gd      mining, drops, placement rules, tool speeds, HUD
+tools/mob_test.gd      creature spawner, slime AI, combat, dialogue, respawn
 tools/dungeon_probe.gd per-tile ASCII of a dungeon + shaft climbability
 tools/world_ascii.gd   ASCII preview of a world, any seed
 tools/world_png.gd     renders a world to PNG (overview/crop/dungeon)
 tools/noise_probe.gd   measured min/max/mean of each noise field
 tools/demo_shots.gd    windowed live capture: injects input, saves screenshots
+tools/mob_shots.gd     windowed capture of slimes + villagers for inspection
 tools/mouse_probe.gd   how injected mouse events behave on this platform
 tools/tiles_probe.gd   WOOD/LEAVES atlas tiles as a colour-keyed ASCII grid
 ```
@@ -76,12 +86,19 @@ tools/tiles_probe.gd   WOOD/LEAVES atlas tiles as a colour-keyed ASCII grid
 ./run_tests.sh /path/to/godot  # or an explicit binary
 ```
 
-Six suites: parse/load check, player sprite art (procedural character
+Seven suites: parse/load check, player sprite art (procedural character
 frames, tools and their wiring), worldgen invariants (terrain, trees,
 caves, and the dungeon gate/shaft), a headless physics test (movement,
 jumping, landing, and that trees are walk-through), a digging/building
 test (mining drops, placement support/overlap rules, tool-speed table,
-HUD text), and a boot smoke test that fails on any engine error.
+HUD text), a mobs + npcs test (seed-derived creature spawner, slime
+idle/aggro hopping, contact damage + i-frames, the melee swing killing
+a slime, villager dialogue and harmlessness, death respawn), and a boot
+smoke test that fails on any engine error.
+
+The movement and digging suites run with `--no-creatures` so their
+expectations see an empty world; the mob suite (and real boots) keep the
+creatures, whose spawn layout is derived from the world seed.
 
 `run_tests.sh` runs `--import` first on purpose. The `class_name` globals
 (`WorldGen`, `TilesetFactory`) only resolve once
@@ -169,17 +186,36 @@ undone a frame or two later by a real compositor motion event, so
 the same `dig_at()`/`place_tile()` path if a held-button loop still
 stalls. See `tools/mouse_probe.gd` for the measurements.
 
+**`_ready()` runs inside `add_child()`, before the spawner positions the
+node.** NPCs captured their wander anchor in `_ready()` — but the world
+does `add_child()` and *then* sets `global_position`, so every villager
+anchored at `(0, 0)` and walked toward the map origin when its turn-back
+logic ran. The anchor is now handed to the npc from the spawn point
+after positioning, with a lazy first-physics-frame capture as a safety
+net for manually placed npcs. If a node's behaviour depends on where it
+was spawned, set that state *after* `add_child()`, not in `_ready()`.
+
 ## Next milestones
 
 - [x] **Mining / placing** — hold-LMB digging with per-material tool
       speeds, tile drops into a hotbar, and support/overlap-checked
       placement. Edits go straight through `TileMapLayer.set_cell()`, so
       the built-in tile collision still works.
+- [x] **Mobs & npcs** — 8 seed-derived slimes spawn across the surface
+      either side of spawn and 2 villagers near it. Slimes hop toward
+      you inside 320px, deal contact damage (1 hp, with i-frames), take
+      knockback, and die to two melee swings — LMB means "hit the mob"
+      when one sits under the cursor, "dig" otherwise. The HUD shows HP
+      and a slime-kill counter; villagers wander a small home radius and
+      cycle lines of dialogue when you press E next to them; dying
+      respawns you at spawn at full health. Launch with
+      `-- --no-creatures` for a creature-free world.
 - [ ] **Lighting** — BFS flood fill from sky + light sources, per-tile
       falloff. Deferred on purpose: it's the highest-rework-risk piece
       because every later system reads the light buffer.
 - [ ] **Chunked generation** — the whole world is currently generated and
       painted in one frame-sliced pass (~1s gen + ~1s paint). Split into
       64x64 chunks generated near the camera.
-- [ ] Entities, items, crafting, health.
+- [ ] Items, crafting, more mobs (and drop pickups — slime gel is the
+      natural first one).
 

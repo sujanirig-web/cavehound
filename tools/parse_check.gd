@@ -12,12 +12,18 @@ const SCRIPTS := [
     "res://scripts/tools.gd",
     "res://scripts/player.gd",
     "res://scripts/player_art.gd",
+    "res://scripts/mob.gd",
+    "res://scripts/mob_art.gd",
+    "res://scripts/npc.gd",
+    "res://scripts/npc_art.gd",
     "res://scripts/target_cursor.gd",
     "res://scripts/world.gd",
     "res://tools/gen_test.gd",
     "res://tools/dig_test.gd",
+    "res://tools/mob_test.gd",
     "res://tools/dungeon_probe.gd",
     "res://tools/demo_shots.gd",
+    "res://tools/mob_shots.gd",
     "res://tools/mouse_probe.gd",
     "res://tools/noise_probe.gd",
     "res://tools/world_png.gd",
@@ -28,6 +34,8 @@ const SCRIPTS := [
 const SCENES := [
     "res://scenes/main.tscn",
     "res://scenes/player.tscn",
+    "res://scenes/mob.tscn",
+    "res://scenes/npc.tscn",
 ]
 
 
