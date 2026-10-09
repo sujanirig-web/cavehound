@@ -32,7 +32,7 @@ const NON_SOLID := [
     WorldGen.Tile.AIR, WorldGen.Tile.WOOD, WorldGen.Tile.LEAVES,
     WorldGen.Tile.PLANK_WALL, WorldGen.Tile.STONE_WALL,
     WorldGen.Tile.GRASS_TUFT, WorldGen.Tile.WILD_GRASS, WorldGen.Tile.FLOWER,
-    WorldGen.Tile.DUNGEON_WALL,
+    WorldGen.Tile.DUNGEON_WALL, WorldGen.Tile.PLATFORM, WorldGen.Tile.TORCH,
 ]
 
 
@@ -68,6 +68,17 @@ static func build() -> TileSet:
             data.set_collision_polygon_points(physics_layer, 0, PackedVector2Array([
                 Vector2(-8, -8), Vector2(8, -8), Vector2(8, 8), Vector2(-8, 8),
             ]))
+
+    # Platforms are walk-through ledges: a thin top strip with one-way
+    # collision, so you can jump up through them and land on top. 4.3
+    # exposes this per collision polygon (layer_id, polygon index).
+    var pf := src.get_tile_data(atlas_coords(WorldGen.Tile.PLATFORM), 0)
+    pf.add_collision_polygon(physics_layer)
+    pf.set_collision_polygon_points(physics_layer, 0, PackedVector2Array([
+        Vector2(-8, -8), Vector2(8, -8), Vector2(8, -4), Vector2(-8, -4),
+    ]))
+    pf.set_collision_polygon_one_way(physics_layer, 0, true)
+    pf.set_collision_polygon_one_way_margin(physics_layer, 0, 1.0)
     return ts
 
 
@@ -262,6 +273,48 @@ static func _paint(img: Image, id: int, ox: int, oy: int) -> void:
                     if alpha < 1.0:
                         c = Color(c.r, c.g, c.b, alpha)
                     _px(img, ox + x, oy + y, c)
+
+        WorldGen.Tile.PLATFORM:
+            # A wooden plank ledge: lit walking surface, grain, and a
+            # shaded underside. Transparent below the board so gaps read
+            # open; the collision strip is a one-way top band.
+            var nf := _noise_field(rng, 5)
+            _fill(img, ox, oy, Color("8a6a3e"), 0, 2)  # lit top
+            _fill(img, ox, oy, Color("6b4f2c"), 2, 3)  # mid wood
+            _fill(img, ox, oy, Color("453318"), 5, 1)  # shaded underside
+            for y in range(1, 5):
+                for x in TILE_SIZE:
+                    if _smooth(nf, 5, x, y) < 0.30:
+                        _px(img, ox + x, oy + y, Color("543d21"))  # grain
+            for i in 4:
+                _px(img, ox + rng.randi_range(0, 15), oy + rng.randi_range(0, 1),
+                        Color("b08a58"))  # light flecks on the surface
+
+        WorldGen.Tile.TORCH:
+            # A torch: wood handle plus an open flame, transparent around
+            # it. Purely decorative for now - the glow arrives with the
+            # lighting pass.
+            _px(img, ox + 7, oy + 7, Color("8a6a3e"))
+            for y in range(8, 15):
+                _px(img, ox + 7, oy + y, Color("6b4f2c") if y < 10 else Color("4f3a1f"))
+            var flame := [
+                [3],
+                [2, 3, 4],
+                [1, 2, 3, 4, 5],
+                [2, 3, 4],
+                [3],
+            ]
+            var tints: Array[Color] = [Color("c87110"), Color("f0a030"), Color("ffd870")]
+            for fy in flame.size():
+                var xs: Array = flame[fy]
+                var tint: Color = tints[mini(fy, 2)]
+                for fx in xs:
+                    _px(img, ox + 7 + fx - 3, oy + 2 + fy, tint)
+            # a warm glow ring, feathered so it never reads as a hard outline
+            for a in 12:
+                var gx := 7 + int(round(cos(deg_to_rad(a * 30)) * 6.0))
+                var gy := 3 + int(round(sin(deg_to_rad(a * 30)) * 5.0))
+                _px(img, ox + gx, oy + gy, Color(1.0, 0.75, 0.35, 0.22))
 
         WorldGen.Tile.COPPER:
             _stone_base(img, ox, oy, rng)

@@ -42,11 +42,13 @@ enum Tile {
     FLOWER = 17,
     DUNGEON_BRICK = 18,
     DUNGEON_WALL = 19,
+    PLATFORM = 20,
+    TORCH = 21,
 }
 
 enum Biome { PLAINS, FOREST, DESERT, JUNGLE, TUNDRA }
 
-const TILE_COUNT := 20
+const TILE_COUNT := 22
 const ATLAS_COLS := 8
 const BEDROCK_DEPTH := 6
 

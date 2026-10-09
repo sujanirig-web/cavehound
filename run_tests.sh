@@ -25,6 +25,7 @@ run "player sprite art" "res://tools/sprite_test.gd"
 run "worldgen invariants" "res://tools/gen_test.gd"
 run "player physics / collision" "res://tools/play_test.gd" -- --no-creatures
 run "digging / building" "res://tools/dig_test.gd" -- --no-creatures
+run "building / crafting" "res://tools/build_test.gd" -- --no-creatures
 run "mobs + npcs" "res://tools/mob_test.gd"
 
 echo

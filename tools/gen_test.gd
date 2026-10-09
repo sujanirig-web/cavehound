@@ -13,7 +13,7 @@ const H := 400
 const NAMES := ["AIR", "DIRT", "GRASS", "STONE", "SAND", "SNOW", "MUD",
         "WOOD", "LEAVES", "COPPER", "IRON", "GOLD", "BEDROCK",
         "PLANK_WALL", "STONE_WALL", "GRASS_TUFT", "WILD_GRASS", "FLOWER",
-        "DUNGEON_BRICK", "DUNGEON_WALL"]
+        "DUNGEON_BRICK", "DUNGEON_WALL", "PLATFORM", "TORCH"]
 
 
 func _initialize() -> void:

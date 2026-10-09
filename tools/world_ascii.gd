@@ -25,11 +25,15 @@ const GLYPH := {
     10: "i",  # iron
     11: "g",  # gold
     12: "B",  # bedrock
+    13: "w",  # plank wall
+    14: "W",  # stone wall
     15: ",",  # grass tuft
     16: "w",  # wild grass
     17: "f",  # flower
     18: "D",  # dungeon brick
     19: "n",  # dungeon wall (background)
+    20: "=",   # platform
+    21: "|",   # torch (vertical)
 }
 
 
@@ -73,6 +77,7 @@ func _initialize() -> void:
 
     print("\nlegend: \" grass  d dirt  # stone  . sand  * snow  m mud")
     print("        | wood  o leaves  c copper  i iron  g gold  B bedrock")
+    print("        w plank wall  W stone wall")
     print("        , tuft  w wild grass  f flower  D dungeon brick")
     print("        : walled cave   (blank) sky or open cave")
     print("        spawn %s   surface y %d" % [gen.spawn, gen.surface[gen.spawn.x]])

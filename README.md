@@ -28,9 +28,10 @@ repo is pure text.
 |---|---|
 | **A / D** or **Left / Right** | Move |
 | **W**, **Up**, or **Space** | Jump (hold for height) |
-| **Hold LMB** | Whack a slime under the cursor - or dig the tile under the cursor when no mob is there |
-| **RMB** | Place the selected block on a supported spot |
-| **Q** | Cycle the held tool (pickaxe ↔ axe) |
+| **Hold LMB** | Whack a slime under the cursor - or dig the tile under the cursor when no mob is there. With the **hammer** out, LMB removes background walls instead |
+| **RMB** | Place the selected item: blocks go on solid ground, wall items go behind you into the walls layer |
+| **Q** | Cycle the held tool (pickaxe ↔ axe ↔ hammer) |
+| **B** | Craft the first affordable recipe from the table in `tools.gd` (plank wall, platform, torch) |
 | **1-4** | Pick a hotbar slot |
 | **E** | Talk to a nearby villager (next line in the HUD) |
 | **T** | Teleport to the dungeon gate |
@@ -50,7 +51,7 @@ stays under the same fingers on AZERTY/QWERTZ.
 ```
 scripts/world_gen.gd       generation passes (only engine dep is FastNoiseLite)
 scripts/tileset_factory.gd paints the TileSet art in code (textured, not flat)
-scripts/tools.gd           tool + mining table (what digs what, how fast)
+scripts/tools.gd           tool + mining table + wall table + crafting recipes
 scripts/target_cursor.gd   aim outline + mining progress fill
 scripts/player.gd          CharacterBody2D controller, dig/build, health, melee
 scripts/player_art.gd      procedural character frames + held tools
@@ -69,6 +70,7 @@ tools/sprite_test.gd   procedural sprite frames and their wiring
 tools/gen_test.gd      worldgen stats + invariant assertions (incl. dungeon)
 tools/play_test.gd     boots the scene, asserts tile collision and movement
 tools/dig_test.gd      mining, drops, placement rules, tool speeds, HUD
+tools/build_test.gd    walls, torches, platform one-way physics, crafting table
 tools/mob_test.gd      creature spawner, slime AI, combat, dialogue, respawn
 tools/dungeon_probe.gd per-tile ASCII of a dungeon + shaft climbability
 tools/world_ascii.gd   ASCII preview of a world, any seed
@@ -95,10 +97,13 @@ frames, tools and their wiring), worldgen invariants (terrain, trees,
 caves, and the dungeon gate/shaft), a headless physics test (movement,
 jumping, landing, and that trees are walk-through), a digging/building
 test (mining drops, placement support/overlap rules, tool-speed table,
-HUD text), a mobs + npcs test (seed-derived creature spawner, slime
-idle/aggro hopping, contact damage + i-frames, the melee swing killing
-a slime, villager dialogue and harmlessness, death respawn), and a boot
-smoke test that fails on any engine error.
+HUD text), a building/crafting test (wall placement and mining, torch
+placement incl. wall-hanging, platform one-way physics - jump up through
+and land on top - plus the crafting table and hammer tool), a mobs +
+npcs test (seed-derived creature spawner, slime idle/aggro hopping,
+contact damage + i-frames, the melee swing killing a slime, villager
+dialogue and harmlessness, death respawn), and a boot smoke test that
+fails on any engine error.
 
 The movement and digging suites run with `--no-creatures` so their
 expectations see an empty world; the mob suite (and real boots) keep the
@@ -215,12 +220,20 @@ was spawned, set that state *after* `add_child()`, not in `_ready()`.
       cycle lines of dialogue when you press E next to them; dying
       respawns you at spawn at full health. Launch with
       `-- --no-creatures` for a creature-free world.
+- [x] **Building** — background walls you place and hammer out (the
+      hammer is the third tool in the Q cycle), walk-through wood
+      platforms (a one-way top strip: jump up through them, land on top),
+      torches that hang on walls, and one-key crafting: chopped trees drop
+      wood, and `B` crafts the first affordable recipe (plank wall, platform,
+      torch). Wall items RMB into the background layer; everything else
+      still needs solid support.
 - [ ] **Lighting** — BFS flood fill from sky + light sources, per-tile
       falloff. Deferred on purpose: it's the highest-rework-risk piece
       because every later system reads the light buffer.
 - [ ] **Chunked generation** — the whole world is currently generated and
       painted in one frame-sliced pass (~1s gen + ~1s paint). Split into
       64x64 chunks generated near the camera.
-- [ ] Items, crafting, more mobs (and drop pickups — slime gel is the
-      natural first one).
+- [ ] Items, doors & NPC housing (a furnished, walled room with a door —
+      the building kit is in place for it), more mobs, and drop pickups
+      (slime gel is the natural first one).
 

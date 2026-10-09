@@ -143,7 +143,8 @@ func _animate(delta: float) -> void:
 
 ## Called every physics frame: cycles tools/slots, mines while the left
 ## button is held, and keeps the aim cursor in sync. A mob under the
-## cursor suppresses digging - LMB means "hit the critter" there.
+## cursor suppresses digging - LMB means "hit the critter" there. The
+## hammer mines background walls instead of foreground blocks.
 func _tool_tick(delta: float) -> void:
     if world == null or world.gen == null:
         return
@@ -153,6 +154,8 @@ func _tool_tick(delta: float) -> void:
     for s in SLOT_COUNT:
         if Input.is_action_just_pressed("slot_%d" % (s + 1)):
             select_slot(s + 1)
+    if Input.is_action_just_pressed("craft"):
+        _craft()
 
     var mouse := get_global_mouse_position()
     var mob: Node = world.mob_at(mouse)
@@ -161,6 +164,17 @@ func _tool_tick(delta: float) -> void:
     var id := _tile_at(target)
     var in_reach := _within_reach(target)
 
+    var wall := _wall_at(target)
+    var mining_wall := false
+    var dig_time := INF
+    if active_tool == "hammer":
+        # The hammer's job is background walls: it will not dig blocks.
+        mining_wall = id == WorldGen.Tile.AIR and Tools.is_wall(wall)
+        if mining_wall:
+            dig_time = Tools.wall_time("hammer", wall)
+    elif Tools.is_diggable(id):
+        dig_time = Tools.mining_time(active_tool, id)
+
     if not in_reach:
         target = Vector2i(-9999, -9999)
         _mine_progress = 0.0
@@ -168,14 +182,17 @@ func _tool_tick(delta: float) -> void:
         _swinging = false
     elif Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) \
             and mob == null \
-            and Tools.is_diggable(id):
+            and is_finite(dig_time):
         if target != _mine_target:
             _mine_target = target
             _mine_progress = 0.0
-        _mine_progress += delta / maxf(Tools.mining_time(active_tool, id), 0.001)
+        _mine_progress += delta / maxf(dig_time, 0.001)
         _swinging = true
         if _mine_progress >= 1.0:
-            dig_at(target)
+            if mining_wall:
+                mine_wall_at(target)
+            else:
+                dig_at(target)
             _mine_progress = 0.0
             _mine_target = Vector2i(-9999, -9999)
     else:
@@ -202,7 +219,47 @@ func dig_at(cell: Vector2i) -> bool:
     return true
 
 
-## Right-click: drop the selected block on a supported spot.
+## Breaks the wall at a cell if it is in reach, and banks the drop.
+## Used by the hammer's mining loop and the test suite.
+func mine_wall_at(cell: Vector2i) -> bool:
+    if world == null or world.gen == null or not _within_reach(cell):
+        return false
+    var w := _wall_at(cell)
+    if not Tools.is_wall(w):
+        return false
+    var item: int = world.mine_wall(cell.x, cell.y)
+    if item >= 0:
+        inventory[item] = inventory.get(item, 0) + 1
+        if selected_item < 0:
+            selected_item = item
+    return true
+
+
+## B: craft the first affordable recipe (Tools.craftable order), then
+## hotbar it. Shared by the input handler and the test suite.
+func _craft() -> void:
+    if world == null:
+        return
+    var made := Tools.craft(inventory)
+    if made < 0:
+        world.hud_flash = "can't craft: need wood (chop a tree)"
+        return
+    inventory[made] = inventory.get(made, 0) + 1
+    if selected_item < 0:
+        selected_item = made
+    world.hud_flash = "crafted %s" % Tools.item_name(made)
+
+
+## What the B key would craft right now, for the HUD.
+func hud_craft_text() -> String:
+    var item := Tools.craftable(inventory)
+    if item < 0:
+        return "B: craft (need wood)"
+    return "B: craft %s (%s)" % [Tools.item_name(item), Tools.recipe_text(item)]
+
+
+## Right-click: drop the selected block on a supported spot. Wall items
+## go into the background layer, everything else into the foreground.
 func _place_at(pos: Vector2) -> void:
     if world == null or world.gen == null:
         return
@@ -212,7 +269,12 @@ func _place_at(pos: Vector2) -> void:
             floori(pos.x / float(TILE)), floori(pos.y / float(TILE)))
     if not _within_reach(target):
         return
-    if world.place_tile(target.x, target.y, selected_item):
+    var placed := false
+    if Tools.is_wall(selected_item):
+        placed = world.place_wall(target.x, target.y, selected_item)
+    else:
+        placed = world.place_tile(target.x, target.y, selected_item)
+    if placed:
         inventory[selected_item] -= 1
         if inventory[selected_item] <= 0:
             inventory.erase(selected_item)
@@ -231,6 +293,16 @@ func _tile_at(cell: Vector2i) -> int:
             or cell.x >= world.gen.width or cell.y >= world.gen.height:
         return -1
     return world.gen.tiles[cell.y * world.gen.width + cell.x]
+
+
+## Wall id at a world cell, or -1 outside the map.
+func _wall_at(cell: Vector2i) -> int:
+    if world == null or world.gen == null:
+        return -1
+    if cell.x < 0 or cell.y < 0 \
+            or cell.x >= world.gen.width or cell.y >= world.gen.height:
+        return -1
+    return world.gen.walls[cell.y * world.gen.width + cell.x]
 
 
 func _within_reach(cell: Vector2i) -> bool:

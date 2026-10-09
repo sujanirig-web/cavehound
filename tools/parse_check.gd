@@ -20,6 +20,7 @@ const SCRIPTS := [
     "res://scripts/world.gd",
     "res://tools/gen_test.gd",
     "res://tools/dig_test.gd",
+    "res://tools/build_test.gd",
     "res://tools/mob_test.gd",
     "res://tools/dungeon_probe.gd",
     "res://tools/demo_shots.gd",

@@ -166,12 +166,15 @@ static func _px(img: Image, x: int, y: int, c: Color) -> void:
 
 # ------------------------------------------------------------------- tools
 
-## Held tool: a 14x14 pickaxe or axe, facing right. Same procedural
-## rationale as everything else here - no PNGs, colours one edit away.
+## Held tool: a 14x14 pickaxe, axe or hammer, facing right. Same
+## procedural rationale as everything else here - no PNGs, colours one
+## edit away.
 static func build_tool(kind: String) -> Texture2D:
     var img := Image.create(14, 14, false, Image.FORMAT_RGBA8)
     img.fill(Color(0, 0, 0, 0))
-    if kind == "axe":
+    if kind == "hammer":
+        _tool_hammer(img)
+    elif kind == "axe":
         _tool_axe(img)
     else:
         _tool_pick(img)
@@ -220,4 +223,25 @@ static func _tool_axe(img: Image) -> void:
             # lit cutting edge on the left, plain steel behind it
             _px(img, x, y, steel_hi if x <= xs[0] + 1 else steel)
     for x in range(7, 11):
+        _px(img, x, 4, steel_dark)
+
+
+## A solid steel head on the same diagonal haft - the wall tool.
+static func _tool_hammer(img: Image) -> void:
+    _tool_handle(img)
+    var steel := Color("9a9aa8")
+    var steel_hi := Color("d8d8e0")
+    var steel_dark := Color("585862")
+    var rows := {
+        0: [8, 9, 10, 11, 12],
+        1: [7, 8, 9, 10, 11, 12],
+        2: [7, 8, 9, 10, 11, 12],
+        3: [8, 9, 10, 11, 12],
+    }
+    for y in rows:
+        var xs: Array = rows[y]
+        for x in xs:
+            # lit face on the left, plain steel behind it
+            _px(img, x, y, steel_hi if x <= xs[0] + 1 else steel)
+    for x in range(8, 12):
         _px(img, x, 4, steel_dark)

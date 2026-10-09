@@ -141,19 +141,20 @@ func _process(_delta: float) -> void:
 
     var tool_text: String = player.hud_tool_text()
     var hotbar: String = player.hud_hotbar_text()
+    var craft_text: String = player.hud_craft_text()
 
     # Reformatting and re-shaping the label every frame is wasted work
     # whenever nothing it shows has changed (most frames, standing
     # still): skip the set entirely unless one of the fields moved.
-    var key := "%d;%d;%d;%d;%d;%d;%s;%s;%s" % [tx, ty, depth, biome,
-            player.hp, slime_kills, tool_text, hotbar, hud_flash]
+    var key := "%d;%d;%d;%d;%d;%d;%s;%s;%s;%s" % [tx, ty, depth, biome,
+            player.hp, slime_kills, tool_text, hotbar, craft_text, hud_flash]
     if key == _hud_key:
         return
     _hud_key = key
 
-    info.text = "x %5d   y %4d   depth %4d   %s   HP %d/%d   %s\n%s\nslimes slain: %d" % [
+    info.text = "x %5d   y %4d   depth %4d   %s   HP %d/%d   %s\n%s\n%s\nslimes slain: %d" % [
             tx, ty, depth, BIOME_NAMES[biome], player.hp, player.MAX_HP,
-            tool_text, hotbar, slime_kills]
+            tool_text, hotbar, craft_text, slime_kills]
     if hud_flash != "":
         info.text += "\n" + hud_flash
 
@@ -181,9 +182,14 @@ func mine_tile(tx: int, ty: int) -> int:
 
 
 ## Puts a tile back. Needs one solid four-neighbour for support (no
-## floating blocks) and must not overlap the player's body.
+## floating blocks) and must not overlap the player's body. Platforms
+## also count as support so ledges can be chained; a torch may instead
+## hang on a background wall in the same cell.
 func place_tile(tx: int, ty: int, item: int) -> bool:
     if tx < 1 or ty < 1 or tx >= WORLD_W - 1 or ty >= WORLD_H - 1:
+        return false
+    if not (TilesetFactory.SOLID.has(item) or item == WorldGen.Tile.PLATFORM
+            or item == WorldGen.Tile.TORCH):
         return false
     var i := ty * WORLD_W + tx
     if gen.tiles[i] != WorldGen.Tile.AIR:
@@ -191,14 +197,57 @@ func place_tile(tx: int, ty: int, item: int) -> bool:
     var supported := false
     for n in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
         var j: int = (ty + n.y) * WORLD_W + (tx + n.x)
-        if TilesetFactory.SOLID.has(gen.tiles[j]):
+        if TilesetFactory.SOLID.has(gen.tiles[j]) \
+                or gen.tiles[j] == WorldGen.Tile.PLATFORM:
             supported = true
             break
-    if not supported or _overlaps_player(tx, ty):
+    if not supported and not (item == WorldGen.Tile.TORCH
+            and gen.walls[i] != WorldGen.Tile.AIR):
+        return false
+    if _overlaps_player(tx, ty):
         return false
     gen.tiles[i] = item
     tiles_layer.set_cell(Vector2i(tx, ty), 0, TilesetFactory.atlas_coords(item))
     return true
+
+
+## Puts a background wall into an air cell. Needs an 8-neighbour that is
+## solid ground or already walled (Terraria-lite), so a house can be
+## started at the surface and then extended outward. Walls are behind
+## the gameplay layer - no player-overlap rule needed.
+func place_wall(tx: int, ty: int, item: int) -> bool:
+    if tx < 1 or ty < 1 or tx >= WORLD_W - 1 or ty >= WORLD_H - 1:
+        return false
+    if not Tools.is_wall(item):
+        return false
+    var i := ty * WORLD_W + tx
+    if gen.tiles[i] != WorldGen.Tile.AIR or gen.walls[i] != WorldGen.Tile.AIR:
+        return false
+    for dy in range(-1, 2):
+        for dx in range(-1, 2):
+            if dx == 0 and dy == 0:
+                continue
+            var j: int = (ty + dy) * WORLD_W + (tx + dx)
+            if TilesetFactory.SOLID.has(gen.tiles[j]) \
+                    or gen.walls[j] != WorldGen.Tile.AIR:
+                gen.walls[i] = item
+                walls_layer.set_cell(Vector2i(tx, ty), 0,
+                        TilesetFactory.atlas_coords(item))
+                return true
+    return false
+
+
+## Breaks a background wall and returns it as an item (-1 = none).
+func mine_wall(tx: int, ty: int) -> int:
+    if tx < 0 or ty < 0 or tx >= WORLD_W or ty >= WORLD_H:
+        return -1
+    var i := ty * WORLD_W + tx
+    var w: int = gen.walls[i]
+    if not Tools.is_wall(w):
+        return -1
+    gen.walls[i] = WorldGen.Tile.AIR
+    walls_layer.set_cell(Vector2i(tx, ty))
+    return w
 
 
 func _overlaps_player(tx: int, ty: int) -> bool:
