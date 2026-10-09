@@ -26,6 +26,7 @@ run "worldgen invariants" "res://tools/gen_test.gd"
 run "player physics / collision" "res://tools/play_test.gd" -- --no-creatures
 run "digging / building" "res://tools/dig_test.gd" -- --no-creatures
 run "mobs + npcs" "res://tools/mob_test.gd"
+run "lightmap" "res://tools/light_test.gd"
 
 echo
 echo "############ boot smoke test ############"

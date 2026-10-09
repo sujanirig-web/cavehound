@@ -89,6 +89,7 @@ static func build_atlas() -> Image:
     for id in WorldGen.TILE_COUNT:
         _paint(img, id,
                 (id % ATLAS_COLS) * TILE_SIZE, (id / ATLAS_COLS) * TILE_SIZE)
+    _ambient_edges(img)
     return img
 
 
@@ -406,6 +407,38 @@ static func _edges(img: Image, ox: int, oy: int, top: Color,
         _fill(img, ox, oy, top, 0, 1)
     if bottom.a > 0.0:
         _fill(img, ox, oy, bottom, TILE_SIZE - 1, 1)
+
+
+## Ambient occlusion + rim light over every solid tile: a softly lit top
+## edge and a shaded bottom edge give terrain volume so a wall of rock
+## reads as raised blocks instead of a flat orange rectangle. Applied once
+## over the finished atlas so individual tiles keep their detail.
+static func _ambient_edges(img: Image) -> void:
+    for id in WorldGen.TILE_COUNT:
+        if not SOLID.has(id):
+            continue
+        var ox := (id % ATLAS_COLS) * TILE_SIZE
+        var oy := (id / ATLAS_COLS) * TILE_SIZE
+        for y in TILE_SIZE:
+            for x in TILE_SIZE:
+                var c := img.get_pixel(ox + x, oy + y)
+                if c.a <= 0.0:
+                    continue
+                var f := 1.0
+                if y == 0:
+                    f += 0.13  # rim light
+                elif y == 1:
+                    f += 0.05
+                elif y == TILE_SIZE - 1:
+                    f -= 0.24  # contact shadow
+                elif y == TILE_SIZE - 2:
+                    f -= 0.10
+                if x == 0 or x == TILE_SIZE - 1:
+                    f -= 0.04  # subtle edge separation
+                img.set_pixel(ox + x, oy + y, Color(
+                        clampf(c.r * f, 0.0, 1.0),
+                        clampf(c.g * f, 0.0, 1.0),
+                        clampf(c.b * f, 0.0, 1.0), c.a))
 
 
 ## A short meandering dark line - cracks make stone read as rock.
