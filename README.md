@@ -227,9 +227,16 @@ was spawned, set that state *after* `add_child()`, not in `_ready()`.
       wood, and `B` crafts the first affordable recipe (plank wall, platform,
       torch). Wall items RMB into the background layer; everything else
       still needs solid support.
-- [ ] **Lighting** — BFS flood fill from sky + light sources, per-tile
-      falloff. Deferred on purpose: it's the highest-rework-risk piece
-      because every later system reads the light buffer.
+- [x] **Lighting / atmosphere** — baked deterministic lightmap
+      (`scripts/lighting.gd`): sky cells seed to full brightness down to
+      the ground row, then alternating relaxation sweeps spread light into
+      cave mouths with a gentle air cost and a steep rock cost, so caves
+      darken with depth and never go fully black. Drawn as a world-sized
+      overlay by `scripts/atmosphere.gd` with a warm additive glow
+      following the player, a dusk sky gradient, baked top-rim/bottom-AO
+      on solid tiles, and a full-screen colour grade + vignette
+      (`shaders/grade.gdshader`). Purely visual — the generator and
+      gameplay data are untouched.
 - [ ] **Chunked generation** — the whole world is currently generated and
       painted in one frame-sliced pass (~1s gen + ~1s paint). Split into
       64x64 chunks generated near the camera.
